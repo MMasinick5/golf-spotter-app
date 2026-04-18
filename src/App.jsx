@@ -1,5 +1,5 @@
-import GolfSpotterApp from "./GolfSpotter";
+import GolfSpotter from './GolfSpotter'
 
 export default function App() {
-  return <GolfSpotterApp />;
+  return <GolfSpotter />
 }
