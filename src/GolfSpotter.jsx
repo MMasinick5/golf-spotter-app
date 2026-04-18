@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 
-const holes = Array.from({ length: 18 }, (_, i) => i + 1);
-
 const STATUS_CONFIG = {
   Ready: { color: "#1D9E75", bg: "#E1F5EE", label: "Ready" },
   "Addressing Ball": { color: "#BA7517", bg: "#FAEEDA", label: "Addressing" },
@@ -14,8 +12,10 @@ const PLAYER_COLORS = ["#1D9E75", "#185FA5", "#993556", "#BA7517"];
 const PLAYER_BG = ["#E1F5EE", "#E6F1FB", "#FBEAF0", "#FAEEDA"];
 
 function Avatar({ name, color, bg, size = 40 }) {
-  const initials = name
+  const safeName = (name || "Player").trim();
+  const initials = safeName
     .split(" ")
+    .filter(Boolean)
     .map((w) => w[0])
     .slice(0, 2)
     .join("")
@@ -39,7 +39,7 @@ function Avatar({ name, color, bg, size = 40 }) {
         flexShrink: 0
       }}
     >
-      {initials}
+      {initials || "P"}
     </div>
   );
 }
@@ -82,15 +82,13 @@ export default function GolfSpotterApp() {
   const [tab, setTab] = useState("round");
   const [saved, setSaved] = useState(false);
 
-  const activePlayers = useMemo(
-    () => players.slice(0, playerCount).sort((a, b) => a.order - b.order),
-    [players, playerCount]
-  );
+  const activePlayers = useMemo(() => {
+    return players.slice(0, playerCount).sort((a, b) => a.order - b.order);
+  }, [players, playerCount]);
 
-  const currentPlayer = useMemo(
-    () => activePlayers.find((p) => p.id === currentPlayerId) ?? activePlayers[0],
-    [activePlayers, currentPlayerId]
-  );
+  const currentPlayer = useMemo(() => {
+    return activePlayers.find((p) => p.id === currentPlayerId) || activePlayers[0] || null;
+  }, [activePlayers, currentPlayerId]);
 
   const playerColor = (id) => PLAYER_COLORS[(id - 1) % PLAYER_COLORS.length];
   const playerBg = (id) => PLAYER_BG[(id - 1) % PLAYER_BG.length];
@@ -98,12 +96,11 @@ export default function GolfSpotterApp() {
   const saveShot = () => {
     if (!currentPlayer) return;
 
+    const entryId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
     setEntries((prev) => [
       {
-        id:
-          typeof crypto !== "undefined" && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: entryId,
         timestamp: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit"
@@ -119,22 +116,25 @@ export default function GolfSpotterApp() {
 
     setNote("");
     setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    window.setTimeout(() => setSaved(false), 1500);
   };
 
   const nextHitter = () => {
     if (!currentPlayer || activePlayers.length === 0) return;
     const idx = activePlayers.findIndex((p) => p.id === currentPlayer.id);
-    setCurrentPlayerId(activePlayers[(idx + 1) % activePlayers.length].id);
+    const nextIdx = (idx + 1) % activePlayers.length;
+    setCurrentPlayerId(activePlayers[nextIdx].id);
   };
 
-  const updatePlayerName = (id, value) =>
+  const updatePlayerName = (id, value) => {
     setPlayers((prev) => prev.map((p) => (p.id === id ? { ...p, name: value } : p)));
+  };
 
   const movePlayer = (id, dir) => {
     const visible = [...activePlayers];
     const idx = visible.findIndex((p) => p.id === id);
     const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+
     if (swapIdx < 0 || swapIdx >= visible.length) return;
 
     const a = visible[idx];
@@ -229,7 +229,7 @@ export default function GolfSpotterApp() {
               }}
             >
               <button
-                onClick={() => setHole(Math.max(1, hole - 1))}
+                onClick={() => setHole((h) => Math.max(1, h - 1))}
                 style={{ color: "#fff", fontSize: 18, lineHeight: 1 }}
               >
                 ‹
@@ -250,7 +250,7 @@ export default function GolfSpotterApp() {
                 </p>
               </div>
               <button
-                onClick={() => setHole(Math.min(18, hole + 1))}
+                onClick={() => setHole((h) => Math.min(18, h + 1))}
                 style={{ color: "#fff", fontSize: 18, lineHeight: 1 }}
               >
                 ›
@@ -410,10 +410,10 @@ export default function GolfSpotterApp() {
                           {idx === 0
                             ? "Hits first"
                             : idx === 1
-                              ? "Hits second"
-                              : idx === 2
-                                ? "Hits third"
-                                : "Hits fourth"}
+                            ? "Hits second"
+                            : idx === 2
+                            ? "Hits third"
+                            : "Hits fourth"}
                         </p>
                       </div>
 
@@ -425,11 +425,7 @@ export default function GolfSpotterApp() {
                             e.stopPropagation();
                             movePlayer(player.id, "up");
                           }}
-                          style={{
-                            fontSize: 14,
-                            color: "var(--color-text-secondary)",
-                            padding: "2px 4px"
-                          }}
+                          style={{ fontSize: 14, color: "var(--color-text-secondary)", padding: "2px 4px" }}
                         >
                           ↑
                         </button>
@@ -438,11 +434,7 @@ export default function GolfSpotterApp() {
                             e.stopPropagation();
                             movePlayer(player.id, "down");
                           }}
-                          style={{
-                            fontSize: 14,
-                            color: "var(--color-text-secondary)",
-                            padding: "2px 4px"
-                          }}
+                          style={{ fontSize: 14, color: "var(--color-text-secondary)", padding: "2px 4px" }}
                         >
                           ↓
                         </button>
@@ -476,55 +468,43 @@ export default function GolfSpotterApp() {
                 Shot Details
               </p>
 
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                    Shot #
-                  </p>
-                  <div
+              <div>
+                <p style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>
+                  Shot #
+                </p>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "var(--color-background-secondary)",
+                    borderRadius: 10,
+                    padding: "6px 10px"
+                  }}
+                >
+                  <button
+                    onClick={() => setShotNumber((n) => Math.max(1, n - 1))}
+                    style={{ fontSize: 20, color: "#1D9E75", fontWeight: 600, width: 28 }}
+                  >
+                    -
+                  </button>
+                  <span
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      background: "var(--color-background-secondary)",
-                      borderRadius: 10,
-                      padding: "6px 10px"
+                      flex: 1,
+                      textAlign: "center",
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: "var(--color-text-primary)"
                     }}
                   >
-                    <button
-                      onClick={() => setShotNumber(Math.max(1, shotNumber - 1))}
-                      style={{
-                        fontSize: 20,
-                        color: "#1D9E75",
-                        fontWeight: 600,
-                        width: 28
-                      }}
-                    >
-                      −
-                    </button>
-                    <span
-                      style={{
-                        flex: 1,
-                        textAlign: "center",
-                        fontSize: 22,
-                        fontWeight: 700,
-                        color: "var(--color-text-primary)"
-                      }}
-                    >
-                      {shotNumber}
-                    </span>
-                    <button
-                      onClick={() => setShotNumber(shotNumber + 1)}
-                      style={{
-                        fontSize: 20,
-                        color: "#1D9E75",
-                        fontWeight: 600,
-                        width: 28
-                      }}
-                    >
-                      +
-                    </button>
-                  </div>
+                    {shotNumber}
+                  </span>
+                  <button
+                    onClick={() => setShotNumber((n) => n + 1)}
+                    style={{ fontSize: 20, color: "#1D9E75", fontWeight: 600, width: 28 }}
+                  >
+                    +
+                  </button>
                 </div>
               </div>
 
@@ -540,17 +520,11 @@ export default function GolfSpotterApp() {
                       style={{
                         padding: "10px 8px",
                         borderRadius: 10,
-                        border:
-                          status === key
-                            ? `2px solid ${cfg.color}`
-                            : "1px solid var(--color-border-tertiary)",
-                        background:
-                          status === key ? cfg.bg : "var(--color-background-primary)",
-                        color:
-                          status === key ? cfg.color : "var(--color-text-secondary)",
+                        border: status === key ? `2px solid ${cfg.color}` : "1px solid var(--color-border-tertiary)",
+                        background: status === key ? cfg.bg : "var(--color-background-primary)",
+                        color: status === key ? cfg.color : "var(--color-text-secondary)",
                         fontWeight: status === key ? 600 : 400,
-                        fontSize: 13,
-                        transition: "all 0.15s"
+                        fontSize: 13
                       }}
                     >
                       {cfg.label}
@@ -582,11 +556,10 @@ export default function GolfSpotterApp() {
                     background: saved ? "#1D9E75" : "#0F6E56",
                     color: "#fff",
                     fontSize: 15,
-                    fontWeight: 600,
-                    transition: "background 0.2s"
+                    fontWeight: 600
                   }}
                 >
-                  {saved ? "✓ Saved!" : "Save Shot"}
+                  {saved ? "Saved!" : "Save Shot"}
                 </button>
                 <button
                   onClick={nextHitter}
@@ -660,14 +633,7 @@ export default function GolfSpotterApp() {
                         size={30}
                       />
                       <div style={{ flex: 1 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            alignItems: "center",
-                            marginBottom: 2
-                          }}
-                        >
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 2 }}>
                           <p style={{ fontSize: 13, fontWeight: 500 }}>{entry.player.name}</p>
                           <Pill color={cfg.color} bg={cfg.bg}>#{entry.shotNumber}</Pill>
                         </div>
@@ -691,18 +657,10 @@ export default function GolfSpotterApp() {
         {tab === "log" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {entries.length === 0 ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "60px 20px",
-                  color: "var(--color-text-secondary)"
-                }}
-              >
+              <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--color-text-secondary)" }}>
                 <p style={{ fontSize: 32, marginBottom: 12 }}>⛳</p>
                 <p style={{ fontSize: 15, fontWeight: 500 }}>No shots logged yet</p>
-                <p style={{ fontSize: 13, marginTop: 4 }}>
-                  Go to Round and save a shot to start tracking.
-                </p>
+                <p style={{ fontSize: 13, marginTop: 4 }}>Go to Round and save a shot to start tracking.</p>
               </div>
             ) : (
               entries.map((entry) => {
@@ -727,27 +685,14 @@ export default function GolfSpotterApp() {
                         size={34}
                       />
                       <div style={{ flex: 1 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            alignItems: "center",
-                            flexWrap: "wrap"
-                          }}
-                        >
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                           <p style={{ fontSize: 14, fontWeight: 600 }}>{entry.player.name}</p>
                           <Pill color={cfg.color} bg={cfg.bg}>{entry.status}</Pill>
                         </div>
                         <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
-                          <p style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                            Hole {entry.hole}
-                          </p>
-                          <p style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                            Shot #{entry.shotNumber}
-                          </p>
-                          <p style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                            {entry.timestamp}
-                          </p>
+                          <p style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Hole {entry.hole}</p>
+                          <p style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Shot #{entry.shotNumber}</p>
+                          <p style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>{entry.timestamp}</p>
                         </div>
                       </div>
                     </div>
@@ -782,12 +727,7 @@ export default function GolfSpotterApp() {
                 overflow: "hidden"
               }}
             >
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderBottom: "0.5px solid var(--color-border-tertiary)"
-                }}
-              >
+              <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
                 <p
                   style={{
                     fontSize: 12,
@@ -813,17 +753,11 @@ export default function GolfSpotterApp() {
                       flex: 1,
                       padding: "12px 0",
                       borderRadius: 10,
-                      border:
-                        playerCount === n
-                          ? "2px solid #1D9E75"
-                          : "1px solid var(--color-border-tertiary)",
-                      background:
-                        playerCount === n ? "#E1F5EE" : "var(--color-background-primary)",
-                      color:
-                        playerCount === n ? "#0F6E56" : "var(--color-text-primary)",
+                      border: playerCount === n ? "2px solid #1D9E75" : "1px solid var(--color-border-tertiary)",
+                      background: playerCount === n ? "#E1F5EE" : "var(--color-background-primary)",
+                      color: playerCount === n ? "#0F6E56" : "var(--color-text-primary)",
                       fontWeight: playerCount === n ? 600 : 400,
-                      fontSize: 18,
-                      transition: "all 0.15s"
+                      fontSize: 18
                     }}
                   >
                     {n}
@@ -840,12 +774,7 @@ export default function GolfSpotterApp() {
                 overflow: "hidden"
               }}
             >
-              <div
-                style={{
-                  padding: "12px 16px",
-                  borderBottom: "0.5px solid var(--color-border-tertiary)"
-                }}
-              >
+              <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
                 <p
                   style={{
                     fontSize: 12,
@@ -865,10 +794,7 @@ export default function GolfSpotterApp() {
                     key={p.id}
                     style={{
                       padding: "10px 16px",
-                      borderBottom:
-                        idx < playerCount - 1
-                          ? "0.5px solid var(--color-border-tertiary)"
-                          : "none",
+                      borderBottom: idx < playerCount - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
                       display: "flex",
                       gap: 10,
                       alignItems: "center"
